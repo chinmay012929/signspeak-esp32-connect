@@ -60,8 +60,7 @@ class MyCallbacks: public BLECharacteristicCallbacks {
       else {
         Serial.print("Received Unknown Command: '");
         Serial.print(rxValue);
-        Serial.println("'");
-      }
+        Serial.println("'");      }
     }
   }
 };
@@ -105,7 +104,7 @@ void setup() {
 
 // -------- Loop --------
 void loop() {
-#if 1 // Set to 1 for MOCK TEST, set to 0 to use real GPS
+#if 0 // Set to 1 for MOCK TEST, set to 0 to use real GPS
   // --- TEMPORARY MOCK TEST ---
   // Instead of waiting for real satellites, just force a fake location every 3 seconds!
   char gpsString[32];
@@ -123,12 +122,23 @@ void loop() {
   delay(3000); // Wait 3 seconds
   // ---------------------------
 #else
+  // --- Debugging info every 5 seconds ---
+  static unsigned long lastGpsPrint = 0;
+  if (millis() - lastGpsPrint > 5000) {
+    lastGpsPrint = millis();
+    if (gps.charsProcessed() < 10) {
+      Serial.println("[GPS DEBUG] No GPS data received yet. Check RX/TX wiring or baud rate.");
+    } else if (!gps.location.isValid()) {
+      Serial.println("[GPS DEBUG] Receiving GPS data, but waiting for satellite fix... (Go outside)");
+    }
+  }
+
   // 📍 Feed GPS data into TinyGPS++
   while (gpsSerial.available() > 0) {
     char c = gpsSerial.read();
     
     // Uncomment this if you still want to see raw NMEA GPS text
-    Serial.write(c); 
+    // Serial.write(c); 
 
     if (gps.encode(c)) {
       // 1. Obtain newly secured lock from GPS Module (TinyGPS++)
