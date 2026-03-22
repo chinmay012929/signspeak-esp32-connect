@@ -6,6 +6,12 @@
 #include <TinyGPS++.h>
 
 #define MOTOR_PIN 27
+#define SOS_BUTTON_PIN 14 // Change this to your actual SOS button pin
+
+unsigned long lastDebounceTime = 0;
+unsigned long debounceDelay = 50; 
+int lastButtonState = HIGH;
+int buttonState = HIGH;
 
 HardwareSerial gpsSerial(1);
 TinyGPSPlus gps;
@@ -69,6 +75,9 @@ class MyCallbacks: public BLECharacteristicCallbacks {
 void setup() {
   Serial.begin(115200);
   pinMode(MOTOR_PIN, OUTPUT);
+  pinMode(SOS_BUTTON_PIN, INPUT_PULLUP);
+  Serial.print("SOS Button Configured on Pin: ");
+  Serial.println(SOS_BUTTON_PIN);
 
   // GPS init
   gpsSerial.begin(9600, SERIAL_8N1, 16, 17);
@@ -104,6 +113,26 @@ void setup() {
 
 // -------- Loop --------
 void loop() {
+  // -------- Read SOS Button --------
+  int reading = digitalRead(SOS_BUTTON_PIN);
+  if (reading != lastButtonState) {
+    lastDebounceTime = millis();
+  }
+  if ((millis() - lastDebounceTime) > debounceDelay) {
+    if (reading != buttonState) {
+      buttonState = reading;
+      if (buttonState == LOW) { // Button pressed!
+        Serial.println("SOS Button Pressed! Sending command to App...");
+        if (deviceConnected && pCharacteristic != nullptr) {
+          pCharacteristic->setValue("SOS");
+          pCharacteristic->notify();
+        }
+      }
+    }
+  }
+  lastButtonState = reading;
+  // ---------------------------------
+
 #if 0 // Set to 1 for MOCK TEST, set to 0 to use real GPS
   // --- TEMPORARY MOCK TEST ---
   // Instead of waiting for real satellites, just force a fake location every 3 seconds!
@@ -123,9 +152,17 @@ void loop() {
   // ---------------------------
 #else
   // --- Debugging info every 5 seconds ---
-  static unsigned long lastGpsPrint = 0;
-  if (millis() - lastGpsPrint > 5000) {
-    lastGpsPrint = millis();
+  static unsigned long lastDebugPrint = 0;
+  if (millis() - lastDebugPrint > 5000) {
+    lastDebugPrint = millis();
+
+    // Debug print for SOS Button
+    int currentBtnState = digitalRead(SOS_BUTTON_PIN);
+    Serial.print("[DEBUG] SOS Button Pin ");
+    Serial.print(SOS_BUTTON_PIN);
+    Serial.print(" State: ");
+    Serial.println(currentBtnState == LOW ? "LOW (Pressed)" : "HIGH (Not Pressed)");
+
     if (gps.charsProcessed() < 10) {
       Serial.println("[GPS DEBUG] No GPS data received yet. Check RX/TX wiring or baud rate.");
     } else if (!gps.location.isValid()) {
